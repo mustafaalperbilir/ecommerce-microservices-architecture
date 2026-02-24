@@ -20,10 +20,10 @@ Yüksek düzeyde ölçeklenebilir, sağlam ve konteynerize edilmiş, **Mikroserv
 
 ## 🏗️ Mimariye Genel Bakış
 
-1. **API Gateway (Port 4000):** İstemciden gelen trafiği karşılar ve içerideki servislere dağıtır.
-2. **Auth Service (Port 5000):** Kullanıcı kaydı ve JWT tabanlı yetkilendirme işlemlerini yürütür.
-3. **Product Service (Port 5001):** Ürün kataloğunu ve stok durumunu yönetir.
-4. **Order Service (Port 5002):** Müşteri siparişlerini işler ve mesaj kuyruğuna (RabbitMQ) olay (event) fırlatır.
-5. **Payment Service (Port 5003):** Sipariş olayları için RabbitMQ'yu dinler, mesajı yakalar ve ödeme senaryosunu işler.
+1. **API Gateway :** İstemciden gelen trafiği karşılar ve içerideki servislere dağıtır.
+2. **Auth Service :** Kullanıcı kaydı ve JWT tabanlı yetkilendirme işlemlerini yürütür.
+3. **Product Service :** Ürün kataloğunu ve stok durumunu yönetir.
+4. **Order Service :** Müşteri siparişlerini işler ve mesaj kuyruğuna (RabbitMQ) olay (event) fırlatır.
+5. **Payment Service :** Sipariş olayları için RabbitMQ'yu dinler, mesajı yakalar ve ödeme senaryosunu işler.
 
 ## 🚀 Kurulum ve Çalıştırma (Lokal Ortam)
