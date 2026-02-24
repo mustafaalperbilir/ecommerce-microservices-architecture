@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import orderRoutes from './routes/order.routes';
+import { listenForPaymentCompletion } from './utils/rabbitmq';
 
 const app = express();
 
@@ -14,3 +15,5 @@ const PORT = process.env.PORT || 5002;
 app.listen(PORT, () => {
   console.log(`🛒 Order Service ${PORT} portunda çalışıyor.`);
 });
+
+listenForPaymentCompletion();

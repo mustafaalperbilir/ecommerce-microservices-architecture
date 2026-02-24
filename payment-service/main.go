@@ -1,22 +1,13 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
-	"time"
+	"os"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// Sipariş verisinin yapısı
-type OrderMessage struct {
-	OrderID     string  `json:"orderId"`
-	UserID      string  `json:"userId"`
-	TotalAmount float64 `json:"totalAmount"`
-}
-
+// Hataları yakalamak için yardımcı fonksiyon
 func failOnError(err error, msg string) {
 	if err != nil {
 		log.Fatalf("%s: %s", msg, err)
@@ -24,66 +15,73 @@ func failOnError(err error, msg string) {
 }
 
 func main() {
-	// 1. RABBITMQ CONSUMER (ARKA PLAN) BAŞLIYOR
+	// 1. RabbitMQ'ya Bağlan
+	rabbitURL := os.Getenv("RABBITMQ_URL")
+	if rabbitURL == "" {
+		rabbitURL = "amqp://admin:Alper225116@rabbitmq:5672/"
+	}
+
+	conn, err := amqp.Dial(rabbitURL)
+	failOnError(err, "RabbitMQ'ya bağlanılamadı")
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	failOnError(err, "RabbitMQ kanalı açılamadı")
+	defer ch.Close()
+
+	// 2. Dinlenecek Kuyruğu Tanımla
+	q, err := ch.QueueDeclare(
+		"order_created", // Kuyruk adı
+		true,            // Durable
+		false,           // Delete when unused
+		false,           // Exclusive
+		false,           // No-wait
+		nil,             // Arguments
+	)
+	failOnError(err, "Kuyruk deklare edilemedi")
+
+	// 3. Kuyruktan Mesajları Tüket (Consume)
+	msgs, err := ch.Consume(
+		q.Name, // queue
+		"",     // consumer
+		true,   // auto-ack
+		false,  // exclusive
+		false,  // no-local
+		false,  // no-wait
+		nil,    // args
+	)
+	failOnError(err, "Kuyruk dinlenemiyor")
+
+	// 4. Sonsuz Döngü Tanımlaması (Sadece BİR KERE tanımlanmalı)
+	var forever chan struct{}
+
 	go func() {
-		// RabbitMQ'ya bağlan (Şifreni ve adresi kontrol et!)
-		conn, err := amqp.Dial("amqp://admin:Alper225116@rabbitmq:5672/")
-		failOnError(err, "RabbitMQ'ya bağlanılamadı")
-		defer conn.Close()
-
-		ch, err := conn.Channel()
-		failOnError(err, "Kanal açılamadı")
-		defer ch.Close()
-
-		// Kuyruğu tanımla (Order service ile aynı isim: order_created)
-		q, err := ch.QueueDeclare(
-			"order_created", // isim
-			true,            // durable
-			false,           // auto-delete
-			false,           // exclusive
-			false,           // no-wait
-			nil,             // arguments
-		)
-		failOnError(err, "Kuyruk tanımlanamadı")
-
-		// Mesajları dinlemeye başla
-		msgs, err := ch.Consume(
-			q.Name, // queue
-			"",     // consumer
-			true,   // auto-ack (mesajı alınca onaylar)
-			false,  // exclusive
-			false,  // no-local
-			false,  // no-wait
-			nil,    // args
-		)
-		failOnError(err, "Mesajlar dinlenemiyor")
-
-		fmt.Println("🐇 RabbitMQ dinleniyor: 'order_created' kuyruğu bekleniyor...")
-
-		// Gelen her mesaj için bir döngü
 		for d := range msgs {
-			var order OrderMessage
-			err := json.Unmarshal(d.Body, &order)
+			log.Printf("📦 RABBİTMQ'DAN YENİ SİPARİŞ GELDİ: %s", d.Body)
+
+			// Kredi kartı çekim simülasyonu
+			log.Printf("💳 Ödeme doğrulandı ve başarıyla çekildi!")
+
+			// 5. Sipariş servisine yanıt gönder (YENİ KISIM)
+			err := ch.Publish(
+				"",                  // exchange
+				"payment_completed", // routing key
+				false,               // mandatory
+				false,               // immediate
+				amqp.Publishing{
+					ContentType: "application/json",
+					Body:        d.Body,
+				})
+
 			if err != nil {
-				log.Printf("Mesaj çözme hatası: %s", err)
-				continue
+				log.Printf("❌ Yanıt gönderilemedi: %s", err)
+			} else {
+				log.Printf("✅ Sipariş servisine 'payment_completed' mesajı gönderildi!")
+				log.Printf("-----------------------------------")
 			}
-
-			fmt.Printf("\n--- YENİ SİPARİŞ YAKALANDI ---\n")
-			fmt.Printf("Sipariş ID: %s\nToplam Tutar: %.2f TL\n", order.OrderID, order.TotalAmount)
-
-			// Ödeme simülasyonu
-			fmt.Println("Ödeme işleniyor (3 saniye)...")
-			time.Sleep(3 * time.Second)
-			fmt.Printf("✅ %s ID'li siparişin ödemesi ONAYLANDI.\n------------------------------\n", order.OrderID)
 		}
 	}()
 
-	// 2. FIBER HTTP SUNUCUSU (ÖN PLAN)
-	app := fiber.New()
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.SendString("Payment Service Ayakta!")
-	})
-
-	log.Fatal(app.Listen(":5003"))
+	log.Printf("⏳ Payment Service (GO) RabbitMQ'yu dinliyor. Çıkmak için CTRL+C")
+	<-forever
 }

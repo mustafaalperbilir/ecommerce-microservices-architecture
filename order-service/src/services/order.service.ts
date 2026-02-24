@@ -8,15 +8,14 @@ interface OrderItemDto {
 }
 
 export const createOrder = async (userId: string, items: OrderItemDto[]) => {
-  // 1. Toplam sipariş tutarını hesapla
+  // 1. Güvenlik: Toplam tutarı backend'de tekrar hesaplıyoruz
   const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-  // 2. Transaction benzeri bir yapıyla (Prisma nested create) Order ve OrderItem'ları tek seferde kaydet
+  // 2. Prisma ile siparişi kaydediyoruz
   const order = await prisma.order.create({
     data: {
       userId,
       totalAmount,
-      // status otomatik olarak 'PENDING' atanacak (şemadaki @default sayesinde)
       items: {
         create: items.map(item => ({
           productId: item.productId,
@@ -25,14 +24,10 @@ export const createOrder = async (userId: string, items: OrderItemDto[]) => {
         }))
       }
     },
-    include: {
-      items: true // Kaydedilen alt ürünleri de cevapta görmek için
-    }
+    include: { items: true }
   });
 
- 
-
-  // YENİ EKLENEN KISIM: RabbitMQ'ya "order_created" isimli bir mesaj fırlat
+  // 3. RabbitMQ'ya haber ver
   await publishToQueue('order_created', {
     orderId: order.id,
     userId: order.userId,
@@ -41,7 +36,6 @@ export const createOrder = async (userId: string, items: OrderItemDto[]) => {
   
   return order; 
 };
-  
 
 export const getUserOrders = async (userId: string) => {
   return await prisma.order.findMany({

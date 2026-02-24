@@ -1,9 +1,14 @@
 import { Router } from 'express';
-import { create, getAll } from '../controllers/product.controller';
+// Senin controller'ındaki GERÇEK isimlerle çağırdık: getAll ve create
+import { getAll, create, getProductById } from '../controllers/product.controller';
 
 const router = Router();
 
-router.post('/', create);       // Ürün ekle
-router.get('/', getAll);        // Ürünleri listele
+// Mevcut Rotalar (Bütün ürünleri getir ve ürün ekle)
+router.get('/', getAll);
+router.post('/', create);
+
+// YENİ EKLENEN ROTA (Sadece bir ID'ye ait ürünü getir)
+router.get('/:id', getProductById); 
 
 export default router;
