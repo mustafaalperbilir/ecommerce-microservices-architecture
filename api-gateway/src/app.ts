@@ -12,6 +12,17 @@ const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 
+// --- GÜVENLİ KİMLİK AKTARIMI (HEADER INJECTION) ---
+const appendUserInfo = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const authReq = req as any; // TypeScript'i sakinleştirmek için
+    if (authReq.user) {
+        // Gateway, token'dan çözdüğü ID'yi header'a yapıştırıyor
+        req.headers['x-user-id'] = authReq.user.id;
+        req.headers['x-user-role'] = authReq.user.role;
+    }
+    next();
+};
+
 // 🚦 TRAFİK RADARI
 app.use((req, res, next) => {
     console.log(`➡️ [Gateway İstek Aldı] ${req.method} ${req.originalUrl}`);
@@ -44,12 +55,16 @@ app.use('/api/products', productAuthGuard, createProxyMiddleware({
     pathRewrite: (path, req: any) => req.originalUrl 
 }));
 
-// 3. ORDER SERVICE (Sadece giriş yapanlar geçebilir - ADMIN şart değil)
-app.use('/api/orders', verifyToken as any, createProxyMiddleware({ 
-    target: 'http://order-service:5002',
-    changeOrigin: true,
-    pathRewrite: (path, req: any) => req.originalUrl 
-}));
+// 3. ORDER SERVICE (Sadece giriş yapanlar geçebilir)
+app.use('/api/orders', 
+    verifyToken as any, 
+    appendUserInfo, // <-- İŞTE BURAYA EKLEDİK!
+    createProxyMiddleware({ 
+        target: 'http://order-service:5002',
+        changeOrigin: true,
+        pathRewrite: (path, req: any) => req.originalUrl 
+    })
+);
 
 app.get('/', (req, res) => {
     res.send('🌐 API Gateway Aktif! Trafik yönlendiriliyor ve GÜVENLİK devrede.');
