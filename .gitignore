@@ -1,0 +1,14 @@
+# Şifreler ve Gizli Bilgiler
+.env
+*/.env
+
+# Node.js Klasörleri (Çok ağır olduğu için gönderilmez)
+node_modules/
+*/node_modules/
+
+# Veritabanı Yedekleri
+postgres_data/
+
+# Derlenmiş dosyalar
+dist/
+build/

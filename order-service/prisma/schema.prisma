@@ -1,0 +1,37 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Ana Sipariş Tablosu
+model Order {
+  id          String      @id @default(uuid())
+  userId      String      // API Gateway'in JWT'den çözüp bize göndereceği ID (Foreign Key YOK!)
+  totalAmount Float
+  status      OrderStatus @default(PENDING) // İlk sipariş her zaman PENDING (Beklemede) başlar
+  items       OrderItem[] // Bir siparişte birden fazla ürün olabilir
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// Siparişin İçindeki Ürünler Tablosu
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id]) // Aynı veritabanında oldukları için relation serbest!
+  productId String  // Product servisteki ID (Foreign Key YOK!)
+  quantity  Int
+  price     Float   // O anki fiyat. Ürünün fiyatı yarın değişirse eski siparişin faturası bozulmasın diye buraya kopyalarız!
+}
+
+// Sipariş Durumları
+enum OrderStatus {
+  PENDING    // Sipariş alındı, ödeme/stok bekleniyor
+  COMPLETED  // Ödeme alındı, stok düşüldü
+  FAILED     // Ödeme reddedildi veya stok yetersiz
+}

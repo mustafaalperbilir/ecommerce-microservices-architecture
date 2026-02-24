@@ -1,0 +1,25 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Kullanıcı Tablosu
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(USER) // RBAC için rol yapısı
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Rolleri sabitleyen Enum (Sadece bu değerler girilebilir)
+enum Role {
+  USER
+  ADMIN
+}

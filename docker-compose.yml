@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # 1. Veritabanı (PostgreSQL) - DBeaver artık buraya bağlanacak
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: Alper225116
+      POSTGRES_DB: ecommerce_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-net
+
+  # 2. Mesaj Kuyruğu (RabbitMQ)
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_server
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: Alper225116
+    networks:
+      - ecommerce-net
+
+  # 3. API Gateway
+  api-gateway:
+    build: ./api-gateway
+    container_name: api_gateway
+    ports:
+      - "4000:4000"
+    depends_on:
+      - auth-service
+      - product-service
+      - order-service
+    networks:
+      - ecommerce-net
+
+  # 4. Mikroservisler
+  auth-service:
+    build: ./auth-service
+    container_name: auth_service
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./auth-service/.env
+    depends_on:
+      - db
+    networks:
+      - ecommerce-net
+
+  product-service:
+    build: ./product-service
+    container_name: product_service
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./product-service/.env
+    depends_on:
+      - db
+    networks:
+      - ecommerce-net
+
+  order-service:
+    build: ./order-service
+    container_name: order_service
+    ports:
+      - "5002:5002"
+    env_file:
+      - ./order-service/.env
+    environment:
+      - RABBITMQ_URL=amqp://admin:Alper225116@rabbitmq:5672
+    depends_on:
+      - db
+      - rabbitmq
+    networks:
+      - ecommerce-net
+
+  payment-service:
+    build: ./payment-service
+    container_name: payment_service
+    ports:
+      - "5003:5003"
+    depends_on:
+      - rabbitmq
+    networks:
+      - ecommerce-net
+
+networks:
+  ecommerce-net:
+    driver: bridge
+
+# Veritabanı verilerinin konteyner silinse bile kaybolmaması için
+volumes:
+  postgres_data:
