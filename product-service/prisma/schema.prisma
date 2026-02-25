@@ -11,9 +11,9 @@ datasource db {
 model Product {
   id          String   @id @default(uuid())
   name        String
-  description String?  // Soru işareti opsiyonel (boş bırakılabilir) demek
+  description String?
   price       Float
-  stock       Int      @default(0)
+  stock       Int
+  imageUrl    String?  // Yeni eklenen alan 🖼️
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 }

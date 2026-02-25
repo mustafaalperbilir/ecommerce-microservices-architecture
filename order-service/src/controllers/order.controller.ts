@@ -1,39 +1,60 @@
 import { Request, Response } from 'express';
-import { createOrder, getUserOrders } from '../services/order.service';
+import * as orderService from '../services/order.service';
 
+// 1. Yeni Sipariş Oluşturma
 export const create = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, items } = req.body;
+    const { userId, items, totalAmount } = req.body;
 
     if (!userId || !items || items.length === 0) {
-      res.status(400).json({ error: 'Kullanıcı ID ve en az bir ürün gereklidir.' });
+      res.status(400).json({ error: 'Kullanıcı bilgisi veya ürün eksik.' });
       return;
     }
 
-    // Servis katmanına 2 parametre gönderiyoruz (Aynı dilden konuşuyorlar)
-    const order = await createOrder(userId, items);
-    
-    res.status(201).json({ message: 'Sipariş başarıyla oluşturuldu (PENDING)', order });
-    
-  } catch (error) {
-  // HATAYI TERMİNALDE GÖRMEK İÇİN BU SATIRI EKLE
-  console.error("CRITICAL_ORDER_ERROR:", error); 
-  
-  const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu';
-  res.status(500).json({ error: errorMessage });
-}
+    const order = await orderService.createOrder(userId, items, totalAmount);
+    res.status(201).json({ message: 'Sipariş başarıyla alındı 🎉', order });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
+// 2. Kullanıcının Kendi Siparişlerini Görmesi
 export const getMyOrders = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.params.userId as string;
-    const orders = await getUserOrders(userId);
+    // 🛠️ ÇÖZÜM: 'as string' ekleyerek TypeScript'i sakinleştirdik
+    const userId = req.params.userId as string; 
+    const orders = await orderService.getUserOrders(userId);
     res.status(200).json(orders);
-  } catch (error) {
-  // HATAYI TERMİNALDE GÖRMEK İÇİN BU SATIRI EKLE
-  console.error("CRITICAL_ORDER_ERROR:", error); 
-  
-  const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu';
-  res.status(500).json({ error: errorMessage });
-}
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 };
+
+// 3. Admin İçin Tüm Siparişleri Getirme
+export const getAll = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const orders = await orderService.getAllOrders();
+    res.status(200).json(orders);
+  } catch (error: any) {
+    // 🚀 KRİTİK DOKUNUŞ: Hatayı buraya yazdırıyoruz ki Docker loglarında görebilelim
+    console.error("❌ Order Service getAll Hatası:", error); 
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateStatus = async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    // 🚀 YENİ: cancelReason bilgisini de istekten (body) alıyoruz
+    const { status, cancelReason } = req.body; 
+    
+    // Service kısmına hem ID, hem yeni durum, hem de varsa sebebi gönderiyoruz
+    const order = await orderService.updateStatus(id, status, cancelReason);
+    
+    res.status(200).json(order);
+  } catch (error) {
+    console.error("Durum güncelleme hatası:", error);
+    res.status(500).json({ error: 'Durum güncellenemedi' });
+  }
+};
+

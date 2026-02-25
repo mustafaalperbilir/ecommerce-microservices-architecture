@@ -8,30 +8,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Ana Sipariş Tablosu
 model Order {
-  id          String      @id @default(uuid())
-  userId      String      // API Gateway'in JWT'den çözüp bize göndereceği ID (Foreign Key YOK!)
-  totalAmount Float
-  status      OrderStatus @default(PENDING) // İlk sipariş her zaman PENDING (Beklemede) başlar
-  items       OrderItem[] // Bir siparişte birden fazla ürün olabilir
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id            String      @id @default(uuid())
+  userId        String
+  totalAmount   Float
+  status        OrderStatus @default(PENDING)
+  
+  // 🚀 YENİ: Kullanıcının iptal veya iade sebebini tutacağımız alan
+  cancelReason  String?     
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  items         OrderItem[]
 }
 
-// Siparişin İçindeki Ürünler Tablosu
+// Siparişin İçindeki Tekil Ürünler Modeli
 model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
-  order     Order   @relation(fields: [orderId], references: [id]) // Aynı veritabanında oldukları için relation serbest!
-  productId String  // Product servisteki ID (Foreign Key YOK!)
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String  // product-service'den gelecek ürünün ID'si
   quantity  Int
-  price     Float   // O anki fiyat. Ürünün fiyatı yarın değişirse eski siparişin faturası bozulmasın diye buraya kopyalarız!
+  price     Float   // Ürünün sipariş anındaki fiyatı (İleride ürünün fiyatı değişse bile sipariş geçmişi etkilenmesin diye)
 }
 
-// Sipariş Durumları
+// Durumlara CANCEL_REQUESTED ve RETURN_REQUESTED ekliyoruz
 enum OrderStatus {
-  PENDING    // Sipariş alındı, ödeme/stok bekleniyor
-  COMPLETED  // Ödeme alındı, stok düşüldü
-  FAILED     // Ödeme reddedildi veya stok yetersiz
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCEL_REQUESTED  // 🚀 YENİ: İptal Talep Edildi (Admin onayı bekliyor)
+  CANCELLED
+  RETURN_REQUESTED  // 🚀 YENİ: İade Talep Edildi (Teslim edilenler için)
+  RETURNED
+  FAILED
 }

@@ -1,17 +1,10 @@
 import prisma from '../config/db';
-import { publishToQueue } from '../utils/rabbitmq';
+// 🚀 KRİTİK: OrderStatus'u doğrudan buradan alıyoruz
+import { OrderStatus } from '@prisma/client';
+import { sendStockUpdate } from '../utils/rabbitmq';
 
-interface OrderItemDto {
-  productId: string;
-  quantity: number;
-  price: number;
-}
-
-export const createOrder = async (userId: string, items: OrderItemDto[]) => {
-  // 1. Güvenlik: Toplam tutarı backend'de tekrar hesaplıyoruz
-  const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-  // 2. Prisma ile siparişi kaydediyoruz
+export const createOrder = async (userId: string, items: any[], totalAmount: number) => {
+  // 1. Önce siparişi veritabanına oluşturuyoruz
   const order = await prisma.order.create({
     data: {
       userId,
@@ -24,17 +17,18 @@ export const createOrder = async (userId: string, items: OrderItemDto[]) => {
         }))
       }
     },
-    include: { items: true }
+    include: { items: true } 
   });
 
-  // 3. RabbitMQ'ya haber ver
-  await publishToQueue('order_created', {
-    orderId: order.id,
-    userId: order.userId,
-    totalAmount: order.totalAmount
-  });
-  
-  return order; 
+  // 🚀 2. SİHİRLİ DOKUNUŞ: Sipariş oluşunca açıkça 'DECREASE' (Azalt) mesajı gönderiyoruz
+  try {
+    console.log("📢 Sipariş başarıyla oluşturuldu, stoklar düşürülüyor...");
+    await sendStockUpdate(items, 'DECREASE'); 
+  } catch (error) {
+    console.error("❌ RabbitMQ mesajı gönderilirken hata oluştu:", error);
+  }
+
+  return order;
 };
 
 export const getUserOrders = async (userId: string) => {
@@ -43,4 +37,41 @@ export const getUserOrders = async (userId: string) => {
     include: { items: true },
     orderBy: { createdAt: 'desc' }
   });
+};
+
+export const getAllOrders = async () => {
+  return await prisma.order.findMany({
+    include: { items: true },
+    orderBy: { createdAt: 'desc' }
+  });
+};
+
+/**
+ * 🚀 updateStatus: Durum günceller ve iptal/iade durumunda stokları iade eder.
+ */
+export const updateStatus = async (orderId: string, status: OrderStatus, cancelReason?: string) => {
+  // 1. Önce siparişi güncelliyoruz (ve içindeki ürünleri çekiyoruz)
+  const order = await prisma.order.update({
+    where: { id: orderId },
+    data: { 
+      status,
+      cancelReason: cancelReason || null 
+    } as any,
+    include: { items: true } // 🚀 Stok iadesi için ürün listesi şart
+  });
+
+  // 🚀 2. STOK İADE MANTIĞI: Eğer iptal veya iade edildiyse 'INCREASE' (Artır) mesajı at
+  const currentStatus = status as string;
+  
+  if (currentStatus === 'CANCELLED' || currentStatus === 'RETURNED') {
+    try {
+      console.log(`📢 Sipariş ${currentStatus} oldu. Stoklar Ürün Servisi'ne iade ediliyor...`);
+      // Burada zaten 'INCREASE' parametresini kullanıyoruz, bu kısım doğru.
+      await sendStockUpdate(order.items, 'INCREASE');
+    } catch (error) {
+      console.error("❌ İptal stok güncelleme mesajı gönderilemedi:", error);
+    }
+  }
+
+  return order;
 };

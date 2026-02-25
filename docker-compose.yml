@@ -40,6 +40,9 @@ services:
       - auth-service
       - product-service
       - order-service
+    environment:
+      - PORT=4000
+      - JWT_SECRET=cok-gizli-super-guvenli-bir-anahtar-2026
     networks:
       - ecommerce-net
 

@@ -1,14 +1,15 @@
 import { Router } from 'express';
-// Senin controller'ındaki GERÇEK isimlerle çağırdık: getAll ve create
-import { getAll, create, getProductById } from '../controllers/product.controller';
+import { getAll, create, getProductById, updateProduct, deleteProduct } from '../controllers/product.controller';
+import upload from '../middlewares/upload'; // ⬅️ Middleware'i import et
 
 const router = Router();
 
-// Mevcut Rotalar (Bütün ürünleri getir ve ürün ekle)
 router.get('/', getAll);
-router.post('/', create);
+router.get('/:id', getProductById);
+router.delete('/:id', deleteProduct);
 
-// YENİ EKLENEN ROTA (Sadece bir ID'ye ait ürünü getir)
-router.get('/:id', getProductById); 
+// 📸 'image' anahtarıyla gelen dosyayı yakala ve Cloudinary'ye yükle
+router.post('/', upload.single('image'), create); 
+router.put('/:id', upload.single('image'), updateProduct);
 
 export default router;

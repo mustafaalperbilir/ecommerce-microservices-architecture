@@ -1,41 +1,62 @@
 "use client";
 
 import { useCartStore } from '@/store/cartStore';
+import { useAuthStore } from '@/store/authStore'; // 1. YENİ EKLENDİ: Kullanıcı bilgisi için
 import { Trash2, Plus, Minus, ArrowLeft, CreditCard, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import axios from 'axios';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation'; // 2. YENİ EKLENDİ: Yönlendirme için
 
 export default function CartPage() {
   const { cart, addToCart, decreaseQuantity, removeFromCart, getTotalPrice } = useCartStore();
-  const [loading, setLoading] = useState(false); // Yükleme durumu için
+  const { user } = useAuthStore(); // Kullanıcı verisini çekiyoruz
+  const [loading, setLoading] = useState(false); 
+  const router = useRouter(); // Yönlendirme motorunu başlatıyoruz
 
-  // --- ÖDEME VE SİPARİŞ MANTIĞI ---
   const handleCheckout = async () => {
     if (cart.length === 0) return;
 
+    const token = localStorage.getItem('token');
+
+    // Güvenliği artırdık: Hem token hem de user.id olmak zorunda
+    if (!token || !user?.id) {
+      alert("Güvenlik Uyarısı: Sipariş verebilmek için lütfen önce giriş yapın!");
+      return; 
+    }
+
     setLoading(true);
     try {
-      // Backend'in (Order Service) beklediği formatta veriyi hazırlıyoruz
+      // 🛠️ ASIL ÇÖZÜM BURADA: Backend'in beklediği o eksiksiz 3'lü paketi hazırladık!
       const orderData = {
-        userId: "user_alper_2026", // Şimdilik statik, ileride Auth sisteminden gelecek
-        items: cart.map(item => ({
+        userId: user.id,               // KİM sipariş veriyor?
+        totalAmount: getTotalPrice(),  // TOPLAM ne kadar tuttu?
+        items: cart.map(item => ({     // İÇİNDE hangi ürünler var?
           productId: item.id,
           quantity: item.quantity,
           price: item.price
         }))
       };
 
-      // API Gateway üzerinden sipariş servisine istek atıyoruz
-      const response = await axios.post('http://localhost:4000/api/orders', orderData);
+      const response = await axios.post('http://localhost:4000/api/orders', orderData, {
+        headers: {
+          Authorization: `Bearer ${token}` 
+        }
+      });
 
       if (response.status === 201) {
-        alert("Siparişiniz başarıyla alındı! ✅\nSipariş No: " + response.data.order.id);
-        // İsteğe bağlı: Sipariş sonrası sepeti temizlemek istersen store'a clearCart ekleyebiliriz.
+        alert("Siparişiniz başarıyla alındı! ✅");
+        router.push('/orders'); // Başarılıysa doğrudan Siparişlerim sayfasına uçur!
       }
+      
     } catch (error) {
       console.error("Sipariş hatası:", error);
-      alert("Sipariş oluşturulamadı! ❌\nLütfen Docker servislerinin ve API Gateway'in çalıştığından emin ol.");
+      
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+         alert("Oturumunuzun süresi dolmuş veya geçersiz. Lütfen tekrar giriş yapın! 🔐");
+      } else {
+         alert("Sipariş oluşturulamadı! ❌\nLütfen Docker servislerinin ve API Gateway'in çalıştığından emin ol.");
+      }
     } finally {
       setLoading(false);
     }
@@ -130,7 +151,7 @@ export default function CartPage() {
             ) : (
               <CreditCard size={20} />
             )}
-            <span>{loading ? 'İşleniyor...' : 'Ödemeye Geç'}</span>
+            <span>{loading ? 'İşleniyor...' : 'Siparişi Tamamla'}</span>
           </button>
         </div>
       </div>
