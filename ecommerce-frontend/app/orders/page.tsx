@@ -43,20 +43,24 @@ export default function OrdersPage() {
         router.push('/');
         return;
       }
-      fetchMyOrders();
+      
+      // Sadece token'ımız varsa veri çekmeye çalış
+      const token = localStorage.getItem('token');
+      if (token) {
+        fetchMyOrders(token);
+      } else {
+        setLoading(true);
+      }
     }
   }, [isMounted, isAuthenticated, user, router]);
 
- const fetchMyOrders = async () => {
+  // 🚀 ÇÖZÜM: Artık userId'ye ihtiyacımız yok! Modern ve güvenli '/my-orders' rotasını kullanıyoruz.
+  const fetchMyOrders = async (token: string) => {
     try {
-      if (!user?.id) return;
-      
-      // 🔑 ÇÖZÜM: LocalStorage'dan token'ı alıyoruz
-      const token = localStorage.getItem('token');
-      
-      const response = await axios.get(`http://localhost:4000/api/orders/user/${user.id}`, {
+      // 🛡️ İstek adresi tamamen güvenli rotamıza (my-orders) çevrildi
+      const response = await axios.get('http://localhost:4000/api/orders/my-orders', {
         headers: {
-          // 🛡️ Kapıdaki güvenliğe kimliğimizi gösteriyoruz
+          // Backend bu token'ı açıp senin kim olduğunu kendisi bulacak
           Authorization: `Bearer ${token}` 
         }
       });
@@ -136,7 +140,7 @@ export default function OrdersPage() {
               const orderDate = new Date(order.createdAt).toLocaleDateString('tr-TR', {
                 year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
               });
-              const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+              const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
               return (
                 <div key={order.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6">

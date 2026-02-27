@@ -54,17 +54,17 @@ export const updateStatus = async (req: any, res: any) => {
 // Kullanıcının sadece KENDİ siparişlerini getiren fonksiyon
 export const getMyOrders = async (req: any, res: any) => {
   try {
-    // Kimliği doğrulanmış kullanıcının ID'sini alıyoruz
     const userId = req.user?.id || req.user?.userId;
     
     if (!userId) {
       return res.status(401).json({ message: "Güvenlik İhlali: Kullanıcı kimliği doğrulanamadı." });
     }
 
-    // Veritabanından sadece bu userId'ye ait siparişleri en yeniden eskiye sıralayarak çek
+    // 🚀 ÇÖZÜM: include: { items: true } ekleyerek siparişin içindeki ürünleri de istiyoruz
     const orders = await prisma.order.findMany({
       where: { userId: userId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: { items: true } // SADECE BU SATIRI EKLEDİK
     });
 
     res.status(200).json(orders);

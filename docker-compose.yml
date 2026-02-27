@@ -26,6 +26,11 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     # 🔒 GÜVENLİK: Şifreleri ana .env'den çekiyoruz
     env_file: .env
     environment:
@@ -74,8 +79,12 @@ services:
     env_file:
       - .env
       - ./product-service/.env
+    # 🚀 ÇÖZÜM: RabbitMQ sağlıklı olana kadar beklemesini söyledik
     depends_on:
-      - db
+      db:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ecommerce-net
 
@@ -90,9 +99,12 @@ services:
       - ./order-service/.env
     environment:
       - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+    # 🚀 ÇÖZÜM: RabbitMQ sağlıklı olana kadar beklemesini söyledik
     depends_on:
-      - db
-      - rabbitmq
+      db:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ecommerce-net
 
@@ -102,8 +114,10 @@ services:
     ports:
       - "5003:5003"
     env_file: .env
+    # 🚀 ÇÖZÜM: RabbitMQ sağlıklı olana kadar beklemesini söyledik
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ecommerce-net
 
