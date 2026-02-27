@@ -21,7 +21,7 @@ interface Order {
   totalAmount: number;
   status: string;
   createdAt: string;
-  cancelReason?: string; // 🚀 YENİ: Veritabanından gelen sebebi buraya ekledik
+  cancelReason?: string;
   items: OrderItem[];
 }
 

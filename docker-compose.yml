@@ -1,15 +1,17 @@
 version: '3.8'
 
 services:
-  # 1. Veritabanı (PostgreSQL) - DBeaver artık buraya bağlanacak
+  # 1. Veritabanı (PostgreSQL)
   db:
     image: postgres:15
     container_name: postgres_db
     restart: always
+    # 🔒 GÜVENLİK: Şifreleri açıkça buraya yazmak yerine ana .env'den çekiyoruz
+    env_file: .env 
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: Alper225116
-      POSTGRES_DB: ecommerce_db
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce_db}
     ports:
       - "5432:5432"
     volumes:
@@ -24,9 +26,11 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    # 🔒 GÜVENLİK: Şifreleri ana .env'den çekiyoruz
+    env_file: .env
     environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: Alper225116
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     networks:
       - ecommerce-net
 
@@ -40,9 +44,10 @@ services:
       - auth-service
       - product-service
       - order-service
+    # 🔒 GÜVENLİK: JWT_SECRET artık burada açıkça yazmıyor, .env'den geliyor
+    env_file: .env
     environment:
       - PORT=4000
-      - JWT_SECRET=cok-gizli-super-guvenli-bir-anahtar-2026
     networks:
       - ecommerce-net
 
@@ -52,7 +57,9 @@ services:
     container_name: auth_service
     ports:
       - "5000:5000"
+    # 🚀 ÇÖZÜM: Hem ana ayarları hem servise özel ayarları güvenli birleştiriyoruz
     env_file:
+      - .env
       - ./auth-service/.env
     depends_on:
       - db
@@ -65,6 +72,7 @@ services:
     ports:
       - "5001:5001"
     env_file:
+      - .env
       - ./product-service/.env
     depends_on:
       - db
@@ -76,10 +84,12 @@ services:
     container_name: order_service
     ports:
       - "5002:5002"
+    # 🚀 ÇÖZÜM: verifyToken hatasını (403) önlemek için JWT_SECRET'ı buradan da okur
     env_file:
+      - .env
       - ./order-service/.env
     environment:
-      - RABBITMQ_URL=amqp://admin:Alper225116@rabbitmq:5672
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
     depends_on:
       - db
       - rabbitmq
@@ -91,6 +101,7 @@ services:
     container_name: payment_service
     ports:
       - "5003:5003"
+    env_file: .env
     depends_on:
       - rabbitmq
     networks:
@@ -100,6 +111,5 @@ networks:
   ecommerce-net:
     driver: bridge
 
-# Veritabanı verilerinin konteyner silinse bile kaybolmaması için
 volumes:
   postgres_data:

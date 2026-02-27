@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as orderService from '../services/order.service';
+import prisma from '../config/db';
 
 // 1. Yeni Sipariş Oluşturma
 export const create = async (req: Request, res: Response): Promise<void> => {
@@ -18,17 +19,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// 2. Kullanıcının Kendi Siparişlerini Görmesi
-export const getMyOrders = async (req: Request, res: Response): Promise<void> => {
-  try {
-    // 🛠️ ÇÖZÜM: 'as string' ekleyerek TypeScript'i sakinleştirdik
-    const userId = req.params.userId as string; 
-    const orders = await orderService.getUserOrders(userId);
-    res.status(200).json(orders);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-};
+
 
 // 3. Admin İçin Tüm Siparişleri Getirme
 export const getAll = async (req: Request, res: Response): Promise<void> => {
@@ -58,3 +49,78 @@ export const updateStatus = async (req: any, res: any) => {
   }
 };
 
+
+
+// Kullanıcının sadece KENDİ siparişlerini getiren fonksiyon
+export const getMyOrders = async (req: any, res: any) => {
+  try {
+    // Kimliği doğrulanmış kullanıcının ID'sini alıyoruz
+    const userId = req.user?.id || req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Güvenlik İhlali: Kullanıcı kimliği doğrulanamadı." });
+    }
+
+    // Veritabanından sadece bu userId'ye ait siparişleri en yeniden eskiye sıralayarak çek
+    const orders = await prisma.order.findMany({
+      where: { userId: userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("❌ Siparişleri getirme hatası:", error);
+    res.status(500).json({ message: "Siparişler alınırken sunucu hatası oluştu." });
+  }
+};
+
+
+export const requestOrderAction = async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const { action, reason } = req.body; // Frontend'den 'reason' olarak geliyor
+    const userId = req.user?.id || req.user?.userId;
+
+    const order = await prisma.order.findUnique({ where: { id: id } });
+
+    if (!order || order.userId !== userId) {
+      return res.status(404).json({ message: "Sipariş bulunamadı veya bu işlem için yetkiniz yok." });
+    }
+
+    // Sebep kontrolü (En az 5 karakter)
+    if (!reason || reason.trim().length < 5) {
+      return res.status(400).json({ message: "Lütfen geçerli bir neden belirtiniz (En az 5 karakter)." });
+    }
+
+    let newStatus: any = order.status;
+
+    if (action === 'CANCEL') {
+      if (order.status !== 'PENDING' && order.status !== 'PROCESSING') {
+        return res.status(400).json({ message: "Siparişiniz hazırlık aşamasını geçtiği için iptal edilemez." });
+      }
+      newStatus = 'CANCEL_REQUESTED';
+    } else if (action === 'RETURN') {
+      if (order.status !== 'DELIVERED') {
+        return res.status(400).json({ message: "Sadece teslim edilen siparişler için iade talebi oluşturulabilir." });
+      }
+      newStatus = 'RETURN_REQUESTED';
+    }
+
+    // 🚀 ŞEMANA UYGUN GÜNCELLEME: 'cancelReason' alanını dolduruyoruz
+    const updatedOrder = await prisma.order.update({
+      where: { id: id },
+      data: { 
+        status: newStatus,
+        cancelReason: reason // Senin şemandaki alan adı
+      }
+    });
+
+    res.status(200).json({ 
+      message: action === 'CANCEL' ? "İptal talebiniz alındı." : "İade talebiniz iletildi.",
+      order: updatedOrder 
+    });
+  } catch (error) {
+    console.error("Talep işleme hatası:", error);
+    res.status(500).json({ message: "Sunucu hatası oluştu." });
+  }
+};
