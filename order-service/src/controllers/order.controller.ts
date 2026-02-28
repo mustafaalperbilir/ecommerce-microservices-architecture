@@ -2,19 +2,30 @@ import { Request, Response } from 'express';
 import * as orderService from '../services/order.service';
 import prisma from '../config/db';
 
-// 1. Yeni Sipariş Oluşturma
 export const create = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, items, totalAmount } = req.body;
+    // 🚀 Body'den gelen yeni adres bilgilerini de değişkenlere alıyoruz
+    const { userId, items, totalAmount, fullName, phone, city, address } = req.body;
 
     if (!userId || !items || items.length === 0) {
       res.status(400).json({ error: 'Kullanıcı bilgisi veya ürün eksik.' });
       return;
     }
 
-    const order = await orderService.createOrder(userId, items, totalAmount);
+    // 🚀 Service fonksiyonuna bu yeni bilgileri de gönderiyoruz
+    const order = await orderService.createOrder(
+      userId, 
+      items, 
+      totalAmount,
+      fullName,
+      phone,
+      city,
+      address
+    );
+
     res.status(201).json({ message: 'Sipariş başarıyla alındı 🎉', order });
   } catch (error: any) {
+    console.error("❌ Sipariş Kayıt Hatası:", error);
     res.status(500).json({ error: error.message });
   }
 };

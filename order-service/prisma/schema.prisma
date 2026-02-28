@@ -15,7 +15,11 @@ model Order {
   status        OrderStatus @default(PENDING)
   
   // 🚀 YENİ: Kullanıcının iptal veya iade sebebini tutacağımız alan
-  cancelReason  String?     
+  cancelReason  String?
+  fullName     String?
+  phone        String?
+  city         String?
+  address      String? 
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

@@ -3,33 +3,39 @@ import prisma from '../config/db';
 import { OrderStatus } from '@prisma/client';
 import { sendStockUpdate } from '../utils/rabbitmq';
 
-export const createOrder = async (userId: string, items: any[], totalAmount: number) => {
-  // 1. Önce siparişi veritabanına oluşturuyoruz
-  const order = await prisma.order.create({
+
+export const createOrder = async (
+  userId: string, 
+  items: any[], 
+  totalAmount: number,
+  // 🚀 YENİ: Adres parametrelerini ekledik
+  fullName?: string,
+  phone?: string,
+  city?: string,
+  address?: string
+) => {
+  return await prisma.order.create({
     data: {
       userId,
       totalAmount,
+      // 🚀 YENİ: Bu alanları veritabanına kaydediyoruz
+      fullName,
+      phone,
+      city,
+      address,
       items: {
-        create: items.map(item => ({
+        create: items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
           price: item.price
         }))
       }
     },
-    include: { items: true } 
+    include: { items: true }
   });
-
-  // 🚀 2. SİHİRLİ DOKUNUŞ: Sipariş oluşunca açıkça 'DECREASE' (Azalt) mesajı gönderiyoruz
-  try {
-    console.log("📢 Sipariş başarıyla oluşturuldu, stoklar düşürülüyor...");
-    await sendStockUpdate(items, 'DECREASE'); 
-  } catch (error) {
-    console.error("❌ RabbitMQ mesajı gönderilirken hata oluştu:", error);
-  }
-
-  return order;
 };
+
+// Diğer fonksiyonların (getAllOrders vb.) koduna dokunmana gerek yok.
 
 export const getUserOrders = async (userId: string) => {
   return await prisma.order.findMany({

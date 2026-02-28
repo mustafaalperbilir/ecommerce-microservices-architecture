@@ -1,23 +1,15 @@
-# --- 1. AŞAMA: İNŞA (BUILDER) ---
-FROM golang:alpine AS builder
+# --- 1. AŞAMA: BUILD ---
+FROM golang:1.21 AS builder
 WORKDIR /app
-
-# Go modül dosyalarını kopyala ve bağımlılıkları indir
 COPY go.mod go.sum ./
 RUN go mod download
-
-# Tüm kodları kopyala ve projeyi derle ("main" adında bir çalıştırılabilir dosya oluştur)
 COPY . .
-RUN go build -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 
-# --- 2. AŞAMA: ÇALIŞTIRMA (RUNNER) ---
-# Sadece çalıştırılabilir dosyayı alıyoruz, böylece imajımız MB'lar seviyesinde kalıyor!
-FROM alpine:latest
-
+# --- 2. AŞAMA: RUN ---
+# debian:bookworm-slim içinde SSL sertifikaları hazır gelir, apk'ya gerek yok
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-# İlk aşamadan sadece derlenmiş dosyayı kopyala
 COPY --from=builder /app/main .
-
-# Çalıştır
 CMD ["./main"]

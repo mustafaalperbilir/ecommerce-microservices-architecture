@@ -2,13 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import dotenv from 'dotenv';
-// Güvenlik duvarlarımız (Sadece bunlar kalmalı)
+// Güvenlik duvarlarımız
 import { verifyToken, requireAdmin } from './middlewares/auth.middleware';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 
@@ -52,8 +52,18 @@ app.use('/api/orders',
     verifyToken as any, 
     appendUserInfo,
     createProxyMiddleware({ 
-        // 🛠️ DÜZELTME: Docker container ismin 'order_service'
         target: 'http://order_service:5002', 
+        changeOrigin: true,
+        pathRewrite: (path, req: any) => req.originalUrl
+    })
+);
+
+// 🚀 4. PAYMENT SERVICE (Ödemeler - YENİ EKLENDİ)
+app.use('/api/payment', 
+    verifyToken as any, // Sadece giriş yapmış kullanıcılar ödeme başlatabilir
+    appendUserInfo,
+    createProxyMiddleware({ 
+        target: 'http://payment_service:5003', // Docker'daki payment servisinin adresi
         changeOrigin: true,
         pathRewrite: (path, req: any) => req.originalUrl
     })

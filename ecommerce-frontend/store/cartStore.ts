@@ -4,6 +4,10 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  image?: string;
+  imageUrl?: string;      // 👈 Backend'den imageUrl olarak gelebilir diye ekledik
+  category?: string;
+  description?: string;   // 👈 İşte o kırmızı hatayı yok edecek sihirli kelime!
 }
 
 export interface CartItem extends Product {
@@ -17,10 +21,15 @@ interface CartState {
   decreaseQuantity: (id: string) => void; // Miktarı 1 azaltma
   getTotalPrice: () => number;
   getTotalItems: () => number;
+  clearCart: () => void;
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
   cart: [],
+
+  clearCart: () => {
+    set({ cart: [] }); // 👈 Sepeti sıfırlayan kod
+  },
 
   addToCart: (product) => {
     set((state) => {

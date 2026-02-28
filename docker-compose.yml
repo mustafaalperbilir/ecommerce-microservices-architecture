@@ -6,7 +6,6 @@ services:
     image: postgres:15
     container_name: postgres_db
     restart: always
-    # 🔒 GÜVENLİK: Şifreleri açıkça buraya yazmak yerine ana .env'den çekiyoruz
     env_file: .env 
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
@@ -31,7 +30,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # 🔒 GÜVENLİK: Şifreleri ana .env'den çekiyoruz
     env_file: .env
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-admin}
@@ -49,7 +47,6 @@ services:
       - auth-service
       - product-service
       - order-service
-    # 🔒 GÜVENLİK: JWT_SECRET artık burada açıkça yazmıyor, .env'den geliyor
     env_file: .env
     environment:
       - PORT=4000
@@ -62,7 +59,6 @@ services:
     container_name: auth_service
     ports:
       - "5000:5000"
-    # 🚀 ÇÖZÜM: Hem ana ayarları hem servise özel ayarları güvenli birleştiriyoruz
     env_file:
       - .env
       - ./auth-service/.env
@@ -79,7 +75,6 @@ services:
     env_file:
       - .env
       - ./product-service/.env
-    # 🚀 ÇÖZÜM: RabbitMQ sağlıklı olana kadar beklemesini söyledik
     depends_on:
       db:
         condition: service_started
@@ -93,13 +88,11 @@ services:
     container_name: order_service
     ports:
       - "5002:5002"
-    # 🚀 ÇÖZÜM: verifyToken hatasını (403) önlemek için JWT_SECRET'ı buradan da okur
     env_file:
       - .env
       - ./order-service/.env
     environment:
       - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
-    # 🚀 ÇÖZÜM: RabbitMQ sağlıklı olana kadar beklemesini söyledik
     depends_on:
       db:
         condition: service_started
@@ -108,13 +101,20 @@ services:
     networks:
       - ecommerce-net
 
+  # 5. Payment Service
   payment-service:
     build: ./payment-service
     container_name: payment_service
     ports:
       - "5003:5003"
-    env_file: .env
-    # 🚀 ÇÖZÜM: RabbitMQ sağlıklı olana kadar beklemesini söyledik
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    env_file:
+      - .env
+      - ./payment-service/.env
+    environment:
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
     depends_on:
       rabbitmq:
         condition: service_healthy
